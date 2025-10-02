@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase リアルタイム・チャット</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        h1 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        
+        /* 認証エリアのスタイル */
+        #auth-container { padding: 20px; border: 1px solid #ccc; background-color: #fff; margin-bottom: 20px; }
+        #auth-container input { display: block; width: 90%; margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        #auth-container button { padding: 10px 15px; margin-right: 10px; cursor: pointer; border: none; border-radius: 5px; }
+        #auth-container .email-auth-btn { background-color: #007bff; color: white; }
+        /* Googleボタンのスタイル */
+        #auth-container .google-auth-btn { background-color: #db4437; color: white; margin-top: 10px; }
+        
+        /* チャットエリアのスタイル */
+        #chat-container { background-color: #fff; border: 1px solid #ccc; padding: 10px; }
+        #messages { 
+            height: 400px; 
+            overflow-y: scroll; 
+            border: 1px solid #eee; 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            background-color: #fafafa;
+        }
+        
+        /* メッセージアイテムのスタイル */
+        .message-item { 
+            padding: 8px 10px; 
+            margin-bottom: 8px; 
+            border-radius: 15px; 
+            clear: both; 
+            position: relative; 
+            max-width: 70%;
+        }
+        .message-item p { margin: 0; word-wrap: break-word; }
+        
+        /* 相手のメッセージ */
+        .other-message { 
+            float: left; 
+            background-color: #e6e6e6; 
+            text-align: left;
+        }
+        /* 自分のメッセージ */
+        .my-message { 
+            float: right; 
+            background-color: #007bff; 
+            color: white; 
+            text-align: right;
+        }
+        
+        /* 削除ボタン */
+        .delete-btn { 
+            position: absolute; 
+            right: -25px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            cursor: pointer; 
+            color: red; 
+            font-size: 0.8em; 
+            opacity: 0; 
+            transition: opacity 0.2s;
+        }
+        .my-message:hover .delete-btn { opacity: 1; } 
+
+        /* メディア */
+        .message-item img, .message-item video { max-width: 100%; height: auto; display: block; margin-top: 5px; border-radius: 5px; }
+
+        /* 入力フォーム */
+        #input-area { display: flex; gap: 10px; align-items: center; }
+        #message-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>リアルタイム・チャット</h1>
+    
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="script.js"></script>
+
+    <div id="auth-container">
+        <h2>ログイン / 会員登録</h2>
+        <input type="email" id="email-input" placeholder="メールアドレス">
+        <input type="password" id="password-input" placeholder="パスワード (6文字以上)">
+        <br>
+        <button onclick="signUp()" class="email-auth-btn">新規登録</button>
+        <button onclick="signIn()" class="email-auth-btn">ログイン</button>
+        
+        <hr style="margin: 20px 0;">
+        
+        <button onclick="signInWithGoogle()" class="google-auth-btn">
+            <img src="https://img.icons8.com/color/16/000000/google-logo.png" style="vertical-align: middle; margin-right: 5px;">
+            Googleでサインイン
+        </button>
+        
+        <p id="auth-message" style="color: red; margin-top: 10px;"></p>
+    </div>
+
+    <div id="chat-container" style="display: none;">
+        <p>ようこそ、<span id="user-email"></span>さん！ <button onclick="signOutUser()">ログアウト</button></p>
+        
+        <div id="messages"></div>
+        
+        <div id="input-area">
+            <input type="text" id="message-input" placeholder="メッセージを入力...">
+            <button onclick="sendMessage()">送信</button>
+        </div>
+        
+        <div style="margin-top: 10px;">
+            <input type="file" id="file-input" accept="image/*,video/*">
+            <button onclick="uploadFile()">ファイル送信</button>
+        </div>
+    </div>
+</body>
+</html>
