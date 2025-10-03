@@ -9,7 +9,7 @@
         
         /* 認証エリアのスタイル */
         #auth-container { padding: 20px; border: 1px solid #ccc; background-color: #fff; margin-bottom: 20px; }
-        #auth-container input { display: block; width: 90%; margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        #auth-container input { display: block; width: 90%; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
         #auth-container button { padding: 10px 15px; margin-right: 10px; cursor: pointer; border: none; border-radius: 5px; }
         #auth-container .email-auth-btn { background-color: #007bff; color: white; }
         /* Googleボタンのスタイル */
@@ -80,20 +80,36 @@
     <script type="module" src="script.js"></script>
 
     <div id="auth-container">
-        <h2>ログイン / 会員登録</h2>
-        <input type="email" id="email-input" placeholder="メールアドレス">
-        <input type="password" id="password-input" placeholder="パスワード (6文字以上)">
-        <br>
-        <button onclick="signUp()" class="email-auth-btn">新規登録</button>
-        <button onclick="signIn()" class="email-auth-btn">ログイン</button>
         
-        <hr style="margin: 20px 0;">
-        
-        <button onclick="signInWithGoogle()" class="google-auth-btn">
-            <img src="https://img.icons8.com/color/16/000000/google-logo.png" style="vertical-align: middle; margin-right: 5px;">
-            Googleでサインイン
-        </button>
-        
+        <div id="login-form" style="display: block;">
+            <h2>ログイン</h2>
+            <input type="email" id="email-input" placeholder="メールアドレス">
+            <input type="password" id="password-input" placeholder="パスワード (6文字以上)">
+            <br>
+            <button onclick="signIn()" class="email-auth-btn">ログイン</button>
+            <button onclick="showSignUpForm()" class="email-auth-btn" style="background-color: #6c757d;">新規登録へ</button>
+            
+            <hr style="margin: 20px 0;">
+            
+            <button onclick="signInWithGoogle()" class="google-auth-btn">
+                <img src="https://img.icons8.com/color/16/000000/google-logo.png" style="vertical-align: middle; margin-right: 5px;">
+                Googleでサインイン
+            </button>
+        </div>
+
+        <div id="signup-form" style="display: none; border: 2px solid #28a745; padding: 15px; background-color: #e2ffe8;">
+            <h2>アカウントを新規作成</h2>
+            <p style="color: #28a745;">**セキュリティ強化のため、reCAPTCHA認証を行います。**</p>
+            <input type="email" id="signup-email-input" placeholder="メールアドレス" style="border: 2px solid #28a745;">
+            <input type="password" id="signup-password-input" placeholder="パスワード (6文字以上)" style="border: 2px solid #28a745;">
+            <br>
+            
+            <div id="recaptcha-container"></div> 
+            
+            <button onclick="signUp()" class="email-auth-btn" style="background-color: #28a745;">アカウントを作成</button>
+            <button onclick="showLoginForm()" class="email-auth-btn" style="background-color: #6c757d;">ログイン画面へ戻る</button>
+        </div>
+
         <p id="auth-message" style="color: red; margin-top: 10px;"></p>
     </div>
 
