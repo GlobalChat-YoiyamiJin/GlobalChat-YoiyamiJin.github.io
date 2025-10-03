@@ -1,12 +1,16 @@
 // firebase-config.js からサービスインスタンスをインポート
 import { auth, db, storage, messagesRef } from './firebase-config.js';
 // モジュール形式のFirestoreとAuth関数をインポート
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js";
+import { 
+    RecaptchaVerifier, // ⭐ reCAPTCHA のインポート
+    GoogleAuthProvider, signInWithPopup, // ⭐ Googleログインのインポート
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js";
 import { addDoc, query, orderBy, onSnapshot, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-storage.js";
-import { GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js";
 
 let currentUserId = null;
+let recaptchaVerifier; // ⭐ reCAPTCHA オブジェクト用変数
 
 // HTML要素を取得
 const authContainer = document.getElementById('auth-container');
@@ -18,6 +22,42 @@ const authMessage = document.getElementById('auth-message');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
 const messagesDiv = document.getElementById('messages');
+const loginForm = document.getElementById('login-form'); // ⭐ 新規追加
+const signupForm = document.getElementById('signup-form'); // ⭐ 新規追加
+const signupEmailInput = document.getElementById('signup-email-input'); // ⭐ 新規追加
+const signupPasswordInput = document.getElementById('signup-password-input'); // ⭐ 新規追加
+
+
+// ====================================================================
+// Z. フォーム切り替え機能
+// ====================================================================
+
+// ログイン画面を表示
+window.showLoginForm = function() {
+    loginForm.style.display = 'block';
+    signupForm.style.display = 'none';
+}
+
+// 新規登録画面を表示し、reCAPTCHAを初期化
+window.showSignUpForm = function() {
+    loginForm.style.display = 'none';
+    signupForm.style.display = 'block';
+    
+    // ⭐ reCAPTCHA の初期化 (Invisible reCAPTCHA)
+    if (!recaptchaVerifier) {
+        recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible', 
+            'callback': (response) => {
+                // 自動検証が成功した場合の処理（ここではsignUp()で捕捉）
+            },
+            'expired-callback': () => {
+                authMessage.textContent = 'reCAPTCHA認証が期限切れになりました。再試行してください。';
+            }
+        });
+        recaptchaVerifier.render(); 
+    }
+}
+
 
 // ====================================================================
 // A. 認証機能 (ログイン/新規登録/ログアウト)
@@ -26,7 +66,7 @@ const messagesDiv = document.getElementById('messages');
 function updateUI(user) {
     if (user) {
         currentUserId = user.uid;
-        userEmailSpan.textContent = user.email;
+        userEmailSpan.textContent = user.email || user.displayName || '匿名ユーザー';
         authContainer.style.display = 'none';
         chatContainer.style.display = 'block';
         authMessage.textContent = '';
@@ -44,27 +84,42 @@ function updateUI(user) {
             unsubscribeListener = null;
         }
     }
+    // 認証状態が変わったら常にログインフォームを表示 (新規登録フォームから戻すため)
+    showLoginForm(); 
 }
 
 // Firebaseの認証状態が変化したときに実行
 onAuthStateChanged(auth, updateUI);
 
-// 新規会員登録
+// 新規会員登録（reCAPTCHA対応版）
 window.signUp = function() {
-    const email = emailInput.value;
-    const password = passwordInput.value;
+    // 登録フォームから値を取得
+    const email = signupEmailInput.value;
+    const password = signupPasswordInput.value;
 
     if (!email || password.length < 6) {
         authMessage.textContent = '有効なメールアドレスと6文字以上のパスワードを入力してください。';
         return;
     }
+    
+    authMessage.textContent = 'reCAPTCHAを検証中です...';
 
-    createUserWithEmailAndPassword(auth, email, password)
+    // reCAPTCHA 検証の強制実行
+    recaptchaVerifier.verify()
+        .then(() => {
+            // reCAPTCHA検証が成功したらアカウントを作成
+            return createUserWithEmailAndPassword(auth, email, password);
+        })
         .then(() => {
             authMessage.textContent = '新規登録成功！自動でログインしました。';
         })
         .catch((error) => {
+            // エラーが発生した場合、reCAPTCHAをリセット
+            if (recaptchaVerifier) {
+                recaptchaVerifier.clear();
+            }
             authMessage.textContent = `登録エラー: ${error.message}`;
+            console.error("登録エラー:", error);
         });
 }
 
@@ -89,6 +144,43 @@ window.signOutUser = function() {
     });
 }
 
+
+// ====================================================================
+// G. 外部プロバイダ機能 (Google)
+// ====================================================================
+
+window.signInWithGoogle = function() {
+    // 1. Google 認証プロバイダを作成
+    const provider = new GoogleAuthProvider();
+    
+    // 2. ポップアップでサインイン処理を実行
+    signInWithPopup(auth, provider)
+        .then((result) => {
+            console.log("Googleログイン成功:", result.user.email);
+            authMessage.textContent = 'Googleアカウントでログインしました！';
+        })
+        .catch((error) => {
+            authMessage.textContent = `Googleログインエラー: ${error.message}`;
+            console.error("Googleサインインエラー:", error);
+        });
+}
+
+// ====================================================================
+// D. ユーザー情報取得機能 (名前表示用)
+// ====================================================================
+
+/**
+ * ユーザーIDから表示名（メールアドレスなど）を取得
+ */
+async function getSenderDisplayName(userId) {
+    if (auth.currentUser && userId === auth.currentUser.uid) {
+        return auth.currentUser.email || auth.currentUser.displayName || '自分';
+    }
+    // 他のユーザーの場合、セキュリティのために匿名IDを表示
+    return `ユーザー (${userId.substring(0, 5)}...)`;
+}
+
+
 // ====================================================================
 // B. メッセージの送受信、リアルタイム表示
 // ====================================================================
@@ -100,10 +192,10 @@ window.sendMessage = function() {
     const messageText = messageInput.value.trim();
     if (messageText === '') return;
 
-    addDoc(messagesRef, { // addDocを使用
+    addDoc(messagesRef, { 
         text: messageText,
         userId: currentUserId,
-        timestamp: serverTimestamp(), // serverTimestampを使用
+        timestamp: serverTimestamp(), 
         type: 'text'
     })
     .then(() => {
@@ -124,16 +216,16 @@ window.uploadFile = function() {
 
     // 1. Storageにファイルをアップロード
     const filePath = `chats/${currentUserId}/${Date.now()}_${file.name}`;
-    const fileRef = storageRef(storage, filePath); // storageRefを使用
+    const fileRef = storageRef(storage, filePath); 
     
-    uploadBytes(fileRef, file).then((snapshot) => { // uploadBytesを使用
-        return getDownloadURL(snapshot.ref); // getDownloadURLを使用
+    uploadBytes(fileRef, file).then((snapshot) => { 
+        return getDownloadURL(snapshot.ref); 
     }).then((downloadURL) => {
         // 2. FirestoreにURLをメッセージとして保存
         const fileType = file.type.startsWith('image/') ? 'image' : 
                          file.type.startsWith('video/') ? 'video' : 'file';
 
-        addDoc(messagesRef, { // addDocを使用
+        addDoc(messagesRef, { 
             text: file.name, 
             userId: currentUserId,
             timestamp: serverTimestamp(),
@@ -154,10 +246,9 @@ let unsubscribeListener = null;
 function startMessageListener() {
     if (unsubscribeListener) return;
 
-    // Firestoreのデータをリアルタイムで監視
-    const messagesQuery = query(messagesRef, orderBy('timestamp')); // queryとorderByを使用
+    const messagesQuery = query(messagesRef, orderBy('timestamp'));
     
-    unsubscribeListener = onSnapshot(messagesQuery, (snapshot) => { // onSnapshotを使用
+    unsubscribeListener = onSnapshot(messagesQuery, (snapshot) => { 
         snapshot.docChanges().forEach((change) => {
             const message = { id: change.doc.id, ...change.doc.data() };
             
@@ -173,8 +264,10 @@ function startMessageListener() {
 }
 
 // メッセージをHTMLに追加する
-function displayMessage(message) {
+async function displayMessage(message) { // ⭐ async 関数
     if (document.getElementById('msg-' + message.id)) return;
+
+    const senderDisplayName = await getSenderDisplayName(message.userId); // ⭐ 名前を取得
 
     const msgElement = document.createElement('div');
     msgElement.id = 'msg-' + message.id;
@@ -186,17 +279,18 @@ function displayMessage(message) {
         msgElement.classList.add('other-message');
     }
 
-    let content = '';
+    // ⭐ 名前表示を追加
+    let content = `<p style="font-size: 0.75em; margin-bottom: 3px; font-weight: bold;">${senderDisplayName}</p>`; 
 
     if (message.type === 'text') {
-        content = `<p>${message.text}</p>`;
+        content += `<p>${message.text}</p>`;
     } else if (message.type === 'image' && message.fileURL) {
-        content = `<img src="${message.fileURL}" alt="画像">`;
+        content += `<img src="${message.fileURL}" alt="画像">`;
     } else if (message.type === 'video' && message.fileURL) {
-        content = `<video controls src="${message.fileURL}"></video>`;
+        content += `<video controls src="${message.fileURL}"></video>`;
     }
     
-    // 送信取り消しボタンの追加（自分のメッセージのみ）
+    // 送信取り消しボタン
     if (message.userId === currentUserId) {
         content += `<span class="delete-btn" onclick="deleteMessage('${message.id}')">✕</span>`;
     }
@@ -219,7 +313,7 @@ function removeMessage(messageId) {
 
 window.deleteMessage = function(messageId) {
     if (confirm('本当にこのメッセージを取り消し、完全に削除しますか？')) {
-        deleteDoc(doc(db, 'messages', messageId)).then(() => { // deleteDocとdocを使用
+        deleteDoc(doc(db, 'messages', messageId)).then(() => {
             console.log("メッセージが正常に取り消されました。");
         }).catch((error) => {
             console.error("メッセージの取り消しエラー: ", error);
@@ -228,31 +322,9 @@ window.deleteMessage = function(messageId) {
     }
 }
 
-// Enterキーでの送信を可能にする
+// Enterキーでの送信を可能にする (ログインフォームではなくメッセージ入力のみ)
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         window.sendMessage();
     }
 });
-
-// ====================================================================
-// G. 外部プロバイダ機能 (Google)
-// ====================================================================
-
-window.signInWithGoogle = function() {
-    // 1. Google 認証プロバイダを作成
-    const provider = new GoogleAuthProvider();
-    
-    // 2. ポップアップでサインイン処理を実行
-    signInWithPopup(auth, provider)
-        .then((result) => {
-            // ログイン成功。updateUIが自動で画面を切り替えます。
-            console.log("Googleログイン成功:", result.user.email);
-            authMessage.textContent = 'Googleアカウントでログインしました！';
-        })
-        .catch((error) => {
-            // ログイン失敗
-            authMessage.textContent = `Googleログインエラー: ${error.message}`;
-            console.error("Googleサインインエラー:", error);
-        });
-}
