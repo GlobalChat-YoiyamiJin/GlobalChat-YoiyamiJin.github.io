@@ -1,13 +1,14 @@
 // ⭐ モジュール形式 (v9) の SDK をインポート
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js";
-import { collection } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js"; // collectionもインポート
+import { getFirestore, collection } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore.js"; 
 import { getStorage } from "https://www.gstatic.com/firebasejs/9.1.0/firebase-storage.js";
 
 // Your web app's Firebase configuration (あなたの情報に置き換わっています)
 const firebaseConfig = {
-  apiKey: "AIzaSyDtjNj_uZuXx9K86QaRCui43HR86tI1-28",
+  // ⭐ 以下の 'AIzaSyDtjNj_uZuXx9K86QaRCui43HR86tI1-28' などの値は、
+  //    あなたがFirebaseコンソールから取得した実際の値に置き換えてください。
+  apiKey: "AIzaSyDtjNj_uZuXx9K86QaRCui43HR86tI1-28", 
   authDomain: "globalchat-yoiyamijin.firebaseapp.com",
   projectId: "globalchat-yoiyamijin",
   storageBucket: "globalchat-yoiyamijin.firebasestorage.app",
